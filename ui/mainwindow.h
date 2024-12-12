@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-#include "main/NekoRay.hpp"
+#include "main/NekoGui.hpp"
 
 #ifndef MW_INTERFACE
 
@@ -13,6 +13,8 @@
 #include <QProcess>
 #include <QTextDocument>
 #include <QShortcut>
+#include <QSemaphore>
+#include <QMutex>
 
 #include "GroupSort.hpp"
 
@@ -21,7 +23,7 @@
 
 #endif
 
-namespace NekoRay::sys {
+namespace NekoGui_sys {
     class CoreProcess;
 }
 
@@ -49,9 +51,11 @@ public:
 
     void neko_start(int _id = -1);
 
-    void neko_stop(bool crash = false);
+    void neko_stop(bool crash = false, bool sem = false);
 
-    void neko_set_spmode(int mode, bool save = true);
+    void neko_set_spmode_system_proxy(bool enable, bool save = true);
+
+    void neko_set_spmode_vpn(bool enable, bool save = true);
 
     void show_log_impl(const QString &log);
 
@@ -60,6 +64,8 @@ public:
     void refresh_connection_list(const QJsonArray &arr);
 
     void RegisterHotkey(bool unregister);
+
+    bool StopVPNProcess(bool unconditional = false);
 
 signals:
 
@@ -135,7 +141,7 @@ private:
     QShortcut *shortcut_ctrl_f = new QShortcut(QKeySequence("Ctrl+F"), this);
     QShortcut *shortcut_esc = new QShortcut(QKeySequence("Esc"), this);
     //
-    NekoRay::sys::CoreProcess *core_process;
+    NekoGui_sys::CoreProcess *core_process;
     qint64 vpn_pid = 0;
     //
     bool qvLogAutoScoll = true;
@@ -143,19 +149,25 @@ private:
     //
     QString title_error;
     int icon_status = -1;
-    QSharedPointer<NekoRay::ProxyEntity> running;
+    std::shared_ptr<NekoGui::ProxyEntity> running;
     QString traffic_update_cache;
     QTime last_test_time;
     //
     int proxy_last_order = -1;
     bool select_mode = false;
+    QMutex mu_starting;
+    QMutex mu_stopping;
+    QMutex mu_exit;
+    QSemaphore sem_stopped;
     int exit_reason = 0;
 
-    QMap<int, QSharedPointer<NekoRay::ProxyEntity>> get_now_selected();
+    QList<std::shared_ptr<NekoGui::ProxyEntity>> get_now_selected_list();
+
+    QList<std::shared_ptr<NekoGui::ProxyEntity>> get_selected_or_group();
 
     void dialog_message_impl(const QString &sender, const QString &info);
 
-    void refresh_proxy_list_impl(const int &id = -1, NekoRay::GroupSortAction groupSortAction = {});
+    void refresh_proxy_list_impl(const int &id = -1, GroupSortAction groupSortAction = {});
 
     void refresh_proxy_list_impl_refresh_data(const int &id = -1);
 
@@ -169,17 +181,15 @@ private:
 
     bool StartVPNProcess();
 
-    bool StopVPNProcess();
-
     // grpc and ...
 
-    static void ExitNekorayCore();
+    static void setup_grpc();
 
-    void speedtest_current_group(int mode);
+    void speedtest_current_group(int mode, bool test_group);
 
-    void test_current();
+    void speedtest_current();
 
-    void setup_grpc();
+    static void stop_core_daemon();
 
     void CheckUpdate();
 

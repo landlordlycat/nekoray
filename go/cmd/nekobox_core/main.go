@@ -5,19 +5,16 @@ import (
 	"os"
 	_ "unsafe"
 
-	"neko/pkg/grpc_server"
-	"neko/pkg/neko_common"
-	"nekobox_core/box_main"
+	"grpc_server"
 
+	"github.com/matsuridayo/libneko/neko_common"
+	boxmain "github.com/sagernet/sing-box/cmd/sing-box"
 	"github.com/sagernet/sing-box/constant"
 )
 
 func main() {
-	fmt.Println("sing-box:", constant.Version, "Neko:", neko_common.Version_neko)
+	fmt.Println("sing-box:", constant.Version, "NekoBox:", neko_common.Version_neko)
 	fmt.Println()
-
-	// local DNS transport
-	_ = os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",netdns=go")
 
 	// nekobox_core
 	if len(os.Args) > 1 && os.Args[1] == "nekobox" {
@@ -27,5 +24,5 @@ func main() {
 	}
 
 	// sing-box
-	box_main.Main()
+	boxmain.Main()
 }

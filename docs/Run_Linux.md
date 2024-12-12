@@ -1,3 +1,54 @@
+## Linux 安装
+
+### Debian 系发行版
+
+使用 Debian 系发行版时，推荐使用 .deb 包安装：
+
+```shell
+sudo apt install ./nekoray-*-debian-x64.deb
+```
+
+安装完成后，桌面快捷方式启动自带参数 `-appdata`，如果想要直接启动并使用之前的配置，注意附带本参数。
+
+### Arch 系发行版
+
+使用 Arch 系发行版时，推荐从 ```aur``` 或 ```archlinuxcn``` 安装：
+
+#### AUR
+##### 最新稳定版
+
+```shell
+[yay/paru] -S nekoray
+```
+
+##### 最新 Git 版 (开发版)
+
+```shell
+[yay/paru] -S nekoray-git
+```
+
+#### archlinuxcn
+
+##### 最新稳定版
+
+```shell
+sudo pacman -S nekoray
+```
+
+##### 最新 Git 版 (开发版)
+
+```shell
+sudo pacman -S nekoray-git
+```
+
+### 其他发行版
+
+下载 .zip 文件，解压到合适的路径，开箱即用。
+
+或下载 .AppImage，并使用 `chmod +x nekoray-*-AppImage-x64.AppImage` 给予可执行权限。
+
+具体使用方法见下文。
+
 ## Linux 运行
 
 **使用 Linux 系统相信您已具备基本的排错能力，

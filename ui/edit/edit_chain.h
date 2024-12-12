@@ -9,6 +9,8 @@ namespace Ui {
 }
 QT_END_NAMESPACE
 
+class ProxyItem;
+
 class EditChain : public QWidget, public ProfileEditor {
     Q_OBJECT
 
@@ -17,15 +19,17 @@ public:
 
     ~EditChain() override;
 
-    void onStart(QSharedPointer<NekoRay::ProxyEntity> _ent) override;
+    void onStart(std::shared_ptr<NekoGui::ProxyEntity> _ent) override;
 
     bool onEnd() override;
 
 private:
     Ui::EditChain *ui;
-    QSharedPointer<NekoRay::ProxyEntity> ent;
+    std::shared_ptr<NekoGui::ProxyEntity> ent;
 
-    void AddProfileToListIfExist(int id);
+    void AddProfileToListIfExist(int profileId);
+
+    static void ReplaceProfile(ProxyItem *w, int profileId);
 
 private slots:
 

@@ -2,14 +2,14 @@
 
 #ifndef NKR_NO_GRPC
 
-#include "go/gen/libcore.pb.h"
+#include "go/grpc_server/gen/libcore.pb.h"
 #include <QString>
 
 namespace QtGrpc {
     class Http2GrpcChannelPrivate;
 }
 
-namespace NekoRay::rpc {
+namespace NekoGui_rpc {
     class Client {
     public:
         explicit Client(std::function<void(const QString &)> onError, const QString &target, const QString &token);
@@ -33,10 +33,11 @@ namespace NekoRay::rpc {
         libcore::UpdateResp Update(bool *rpcOK, const libcore::UpdateReq &request);
 
     private:
-        std::unique_ptr<QtGrpc::Http2GrpcChannelPrivate> grpc_channel;
+        std::function<std::unique_ptr<QtGrpc::Http2GrpcChannelPrivate>()> make_grpc_channel;
+        std::unique_ptr<QtGrpc::Http2GrpcChannelPrivate> default_grpc_channel;
         std::function<void(const QString &)> onError;
     };
 
     inline Client *defaultClient;
-} // namespace NekoRay::rpc
+} // namespace NekoGui_rpc
 #endif

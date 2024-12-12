@@ -31,7 +31,13 @@ private:
 
 private slots:
 
+    void refresh_auth();
+
     void on_set_custom_icon_clicked();
+
+    void on_inbound_auth_clicked();
+
+    void on_core_settings_clicked();
 };
 
 #endif // DIALOG_BASIC_SETTINGS_H

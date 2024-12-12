@@ -26,6 +26,9 @@
 #include <QDir>
 
 #ifdef Q_OS_WIN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <shellapi.h>
 #include <sddl.h>
@@ -45,7 +48,7 @@ Returns the return value of the executed command
 uint WinCommander::runProcessElevated(const QString &path,
                                       const QStringList &parameters,
                                       const QString &workingDir,
-                                      bool hide, bool aWait) {
+                                      int nShow, bool aWait) {
     uint result = 0;
 
 #ifdef Q_OS_WIN
@@ -57,7 +60,7 @@ uint WinCommander::runProcessElevated(const QString &path,
 
     LPCTSTR pszParameters = (LPCTSTR)params.utf16();
     QString dir;
-    if (workingDir.isEmpty())
+    if (workingDir.count() == 0)
         dir = QDir::toNativeSeparators(QDir::currentPath());
     else
         dir = QDir::toNativeSeparators(workingDir);
@@ -76,7 +79,7 @@ uint WinCommander::runProcessElevated(const QString &path,
     shex.lpParameters = pszParameters;
     shex.lpDirectory  = pszDirectory;
     // https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
-    shex.nShow        = hide ? SW_HIDE : SW_SHOWMINIMIZED;
+    shex.nShow        = nShow;
 
     ShellExecuteEx(&shex);
     if (shex.hProcess)

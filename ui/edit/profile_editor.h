@@ -7,11 +7,14 @@
 
 class ProfileEditor {
 public:
-    virtual void onStart(QSharedPointer<NekoRay::ProxyEntity> ent) = 0;
+    virtual void onStart(std::shared_ptr<NekoGui::ProxyEntity> ent) = 0;
 
     virtual bool onEnd() = 0;
 
     std::function<QWidget *()> get_edit_dialog;
+    std::function<QString()> get_edit_text_name;
+    std::function<QString()> get_edit_text_serverAddress;
+    std::function<QString()> get_edit_text_serverPort;
 
     // cached editor
 

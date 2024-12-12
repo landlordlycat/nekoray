@@ -3,15 +3,18 @@
 
 #include "fmt/VMessBean.hpp"
 
+#include <QUuid>
+
 EditVMess::EditVMess(QWidget *parent) : QWidget(parent), ui(new Ui::EditVMess) {
     ui->setupUi(this);
+    connect(ui->uuidgen, &QPushButton::clicked, this, [=] { ui->uuid->setText(QUuid::createUuid().toString().remove("{").remove("}")); });
 }
 
 EditVMess::~EditVMess() {
     delete ui;
 }
 
-void EditVMess::onStart(QSharedPointer<NekoRay::ProxyEntity> _ent) {
+void EditVMess::onStart(std::shared_ptr<NekoGui::ProxyEntity> _ent) {
     this->ent = _ent;
     auto bean = this->ent->VMessBean();
 

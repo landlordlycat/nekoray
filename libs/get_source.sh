@@ -1,23 +1,41 @@
 #!/bin/bash
 set -e
 
-source libs/deploy_common.sh
-
-#### get source ####
-COMMIT_M=$(cat matsuri_commit.txt)
-COMMIT_V=$(cat core_commit.txt)
-
+source libs/env_deploy.sh
+ENV_NEKORAY=1
+source libs/get_source_env.sh
 pushd ..
 
-git clone --no-checkout https://github.com/MatsuriDayo/Matsuri.git
-git clone --no-checkout https://github.com/MatsuriDayo/v2ray-core.git
+####
 
-pushd Matsuri
-git checkout $COMMIT_M
+if [ ! -d "sing-box" ]; then
+  git clone --no-checkout https://github.com/MatsuriDayo/sing-box.git
+fi
+pushd sing-box
+git checkout "$COMMIT_SING_BOX"
+
 popd
 
-pushd v2ray-core
-git checkout $COMMIT_V
+####
+
+if [ ! -d "sing-quic" ]; then
+  git clone --no-checkout https://github.com/MatsuriDayo/sing-quic.git
+fi
+pushd sing-quic
+git checkout "$COMMIT_SING_QUIC"
+
 popd
+
+####
+
+if [ ! -d "libneko" ]; then
+  git clone --no-checkout https://github.com/MatsuriDayo/libneko.git
+fi
+pushd libneko
+git checkout "$COMMIT_LIBNEKO"
+
+popd
+
+####
 
 popd

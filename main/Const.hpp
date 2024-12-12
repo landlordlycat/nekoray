@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NekoRay {
+namespace NekoGui {
     namespace DomainMatcher {
         enum DomainMatcher {
             DEFAULT,
@@ -16,18 +16,10 @@ namespace NekoRay {
         };
     }
 
-    namespace SystemProxyMode {
-        enum SystemProxyMode {
-            DISABLE,
-            SYSTEM_PROXY,
-            VPN,
-        };
-    }
-
     namespace CoreType {
         enum CoreType {
-            V2RAY,
+            V2RAY, // DO NOT USE
             SING_BOX,
         };
     }
-} // namespace NekoRay
+} // namespace NekoGui

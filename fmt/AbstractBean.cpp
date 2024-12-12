@@ -4,13 +4,15 @@
 #include <QHostInfo>
 #include <QUrl>
 
-namespace NekoRay::fmt {
+namespace NekoGui_fmt {
     AbstractBean::AbstractBean(int version) {
         this->version = version;
         _add(new configItem("_v", &this->version, itemType::integer));
         _add(new configItem("name", &name, itemType::string));
         _add(new configItem("addr", &serverAddress, itemType::string));
         _add(new configItem("port", &serverPort, itemType::integer));
+        _add(new configItem("c_cfg", &custom_config, itemType::string));
+        _add(new configItem("c_out", &custom_outbound, itemType::string));
     }
 
     QString AbstractBean::ToNekorayShareLink(const QString &type) {
@@ -36,7 +38,7 @@ namespace NekoRay::fmt {
     }
 
     QString AbstractBean::DisplayTypeAndName() {
-        return QString("[%1] %2").arg(DisplayType(), DisplayName());
+        return QStringLiteral("[%1] %2").arg(DisplayType(), DisplayName());
     }
 
     void AbstractBean::ResolveDomainToIP(const std::function<void()> &onFinished) {
@@ -50,6 +52,7 @@ namespace NekoRay::fmt {
             return;
         }
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0) // TODO older QT
         QHostInfo::lookupHost(serverAddress, QApplication::instance(), [=](const QHostInfo &host) {
             auto addr = host.addresses();
             if (!addr.isEmpty()) {
@@ -61,15 +64,16 @@ namespace NekoRay::fmt {
 
                 // replace ws tls
                 if (stream != nullptr) {
-                    if (stream->security == "tls" && !stream->sni.isEmpty()) {
+                    if (stream->security == "tls" && stream->sni.isEmpty()) {
                         stream->sni = domain;
                     }
-                    if (stream->network == "ws" && !stream->host.isEmpty()) {
+                    if (stream->network == "ws" && stream->host.isEmpty()) {
                         stream->host = domain;
                     }
                 }
             }
             onFinished();
         });
+#endif
     }
-} // namespace NekoRay::fmt
+} // namespace NekoGui_fmt

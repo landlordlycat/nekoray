@@ -3,9 +3,11 @@
 
 #include <QMessageBox>
 
-ProxyItem::ProxyItem(QWidget *parent, const QSharedPointer<NekoRay::ProxyEntity> &ent, QListWidgetItem *item)
+ProxyItem::ProxyItem(QWidget *parent, const std::shared_ptr<NekoGui::ProxyEntity> &ent, QListWidgetItem *item)
     : QWidget(parent), ui(new Ui::ProxyItem) {
     ui->setupUi(this);
+    this->setLayoutDirection(Qt::LeftToRight);
+
     this->item = item;
     this->ent = ent;
     if (ent == nullptr) return;
@@ -39,4 +41,8 @@ void ProxyItem::on_remove_clicked() {
         // TODO do remove (or not) -> callback
         delete item;
     }
+}
+
+QPushButton *ProxyItem::get_change_button() {
+    return ui->change;
 }

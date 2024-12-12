@@ -5,7 +5,7 @@
 
 #ifndef NKR_NO_GRPC
 
-#include "main/NekoRay.hpp"
+#include "main/NekoGui.hpp"
 
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
@@ -49,7 +49,7 @@ namespace QtGrpc {
         }
     };
 
-    class Http2GrpcChannelPrivate : public QObject {
+    class Http2GrpcChannelPrivate {
     private:
         QThread *thread;
         QNetworkAccessManager *nm;
@@ -57,11 +57,6 @@ namespace QtGrpc {
         QString url_base;
         QString serviceName;
         QByteArray nekoray_auth;
-
-        // TODO Fixed?
-        // https://github.com/semlanik/qtprotobuf/issues/116
-        //        setCachingEnabled:  5  bytesDownloaded
-        //        QNetworkReplyImpl: backend error: caching was enabled after some bytes had been written
 
         // async
         QNetworkReply *post(const QString &method, const QString &service, const QByteArray &args) {
@@ -71,7 +66,9 @@ namespace QtGrpc {
             QNetworkRequest request(callUrl);
             // request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, false);
             // request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
             request.setAttribute(QNetworkRequest::Http2DirectAttribute, true);
+#endif
             request.setHeader(QNetworkRequest::ContentTypeHeader, QLatin1String{"application/grpc"});
             request.setRawHeader("Cache-Control", "no-store");
             request.setRawHeader(GrpcAcceptEncodingHeader, QByteArray{"identity,deflate,gzip"});
@@ -117,9 +114,7 @@ namespace QtGrpc {
                 abortTimer = new QTimer;
                 abortTimer->setSingleShot(true);
                 abortTimer->setInterval(timeout_ms);
-                connect(abortTimer, &QTimer::timeout, abortTimer, [=]() {
-                    networkReply->abort();
-                });
+                QObject::connect(abortTimer, &QTimer::timeout, networkReply, &QNetworkReply::abort);
                 abortTimer->start();
             }
 
@@ -156,10 +151,17 @@ namespace QtGrpc {
             thread->start();
         }
 
+        ~Http2GrpcChannelPrivate() {
+            nm->deleteLater();
+            thread->quit();
+            thread->wait();
+            thread->deleteLater();
+        }
+
         QNetworkReply::NetworkError Call(const QString &methodName,
                                          const google::protobuf::Message &req, google::protobuf::Message *rsp,
                                          int timeout_ms = 0) {
-            if (!NekoRay::dataStore->core_running) return QNetworkReply::NetworkError(-1919);
+            if (!NekoGui::dataStore->core_running) return QNetworkReply::NetworkError(-1919);
 
             std::string reqStr;
             req.SerializeToString(&reqStr);
@@ -193,25 +195,27 @@ namespace QtGrpc {
     };
 } // namespace QtGrpc
 
-namespace NekoRay::rpc {
+namespace NekoGui_rpc {
+
     Client::Client(std::function<void(const QString &)> onError, const QString &target, const QString &token) {
-        this->grpc_channel = std::make_unique<QtGrpc::Http2GrpcChannelPrivate>(target, token, "libcore.LibcoreService");
+        this->make_grpc_channel = [=]() { return std::make_unique<QtGrpc::Http2GrpcChannelPrivate>(target, token, "libcore.LibcoreService"); };
+        this->default_grpc_channel = make_grpc_channel();
         this->onError = std::move(onError);
     }
 
 #define NOT_OK      \
     *rpcOK = false; \
-    onError(QString("QNetworkReply::NetworkError code: %1\n").arg(status));
+    onError(QStringLiteral("QNetworkReply::NetworkError code: %1\n").arg(status));
 
     void Client::Exit() {
         libcore::EmptyReq request;
         libcore::EmptyResp reply;
-        grpc_channel->Call("Exit", request, &reply, 500);
+        default_grpc_channel->Call("Exit", request, &reply, 500);
     }
 
     QString Client::Start(bool *rpcOK, const libcore::LoadConfigReq &request) {
         libcore::ErrorResp reply;
-        auto status = grpc_channel->Call("Start", request, &reply, 3000);
+        auto status = default_grpc_channel->Call("Start", request, &reply);
 
         if (status == QNetworkReply::NoError) {
             *rpcOK = true;
@@ -225,7 +229,7 @@ namespace NekoRay::rpc {
     QString Client::Stop(bool *rpcOK) {
         libcore::EmptyReq request;
         libcore::ErrorResp reply;
-        auto status = grpc_channel->Call("Stop", request, &reply, 3000);
+        auto status = default_grpc_channel->Call("Stop", request, &reply);
 
         if (status == QNetworkReply::NoError) {
             *rpcOK = true;
@@ -242,7 +246,7 @@ namespace NekoRay::rpc {
         request.set_direct(direct);
 
         libcore::QueryStatsResp reply;
-        auto status = grpc_channel->Call("QueryStats", request, &reply, 500);
+        auto status = default_grpc_channel->Call("QueryStats", request, &reply, 500);
 
         if (status == QNetworkReply::NoError) {
             return reply.traffic();
@@ -254,10 +258,10 @@ namespace NekoRay::rpc {
     std::string Client::ListConnections() {
         libcore::EmptyReq request;
         libcore::ListConnectionsResp reply;
-        auto status = grpc_channel->Call("ListConnections", request, &reply, 500);
+        auto status = default_grpc_channel->Call("ListConnections", request, &reply, 500);
 
         if (status == QNetworkReply::NoError) {
-            return reply.matsuri_connections_json();
+            return reply.nekoray_connections_json();
         } else {
             return "";
         }
@@ -267,7 +271,7 @@ namespace NekoRay::rpc {
 
     libcore::TestResp Client::Test(bool *rpcOK, const libcore::TestReq &request) {
         libcore::TestResp reply;
-        auto status = grpc_channel->Call("Test", request, &reply);
+        auto status = make_grpc_channel()->Call("Test", request, &reply);
 
         if (status == QNetworkReply::NoError) {
             *rpcOK = true;
@@ -280,7 +284,7 @@ namespace NekoRay::rpc {
 
     libcore::UpdateResp Client::Update(bool *rpcOK, const libcore::UpdateReq &request) {
         libcore::UpdateResp reply;
-        auto status = grpc_channel->Call("Update", request, &reply);
+        auto status = default_grpc_channel->Call("Update", request, &reply);
 
         if (status == QNetworkReply::NoError) {
             *rpcOK = true;
@@ -290,6 +294,6 @@ namespace NekoRay::rpc {
             return reply;
         }
     }
-} // namespace NekoRay::rpc
+} // namespace NekoGui_rpc
 
 #endif

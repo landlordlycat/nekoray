@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(nekoray VERSION 0.1 LANGUAGES CXX)
+project(nekobox VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -29,19 +29,24 @@ if (NKR_CROSS)
     set_property(TARGET Qt5::lupdate PROPERTY IMPORTED_LOCATION /usr/bin/lupdate)
 endif ()
 
-# Windows
-include("cmake/fuck_windows/fuck.cmake")
+#### Platform Variables ####
+if (WIN32)
+    include("cmake/windows/windows.cmake")
+else ()
+    include("cmake/linux/linux.cmake")
+endif ()
 
 #### default prefix path ####
 
-if (NKR_PACKAGE)
-    list(APPEND NKR_LIBS ${CMAKE_SOURCE_DIR}/libs/deps/package)
-else ()
-    list(APPEND NKR_LIBS ${CMAKE_SOURCE_DIR}/libs/deps/built)
+if (NOT NKR_LIBS)
+    if (NKR_PACKAGE)
+        list(APPEND NKR_LIBS ${CMAKE_SOURCE_DIR}/libs/deps/package)
+    else ()
+        list(APPEND NKR_LIBS ${CMAKE_SOURCE_DIR}/libs/deps/built)
+    endif ()
 endif ()
 
-if (NKR_DISABLE_LIBS)
-else ()
+if (NOT NKR_DISABLE_LIBS)
     list(APPEND CMAKE_PREFIX_PATH ${NKR_LIBS})
 endif ()
 
@@ -58,10 +63,6 @@ include("cmake/nkr.cmake")
 
 find_package(Threads)
 
-if (NKR_PACKAGE OR NKR_PACKAGE_MACOS)
-    nkr_add_compile_definitions(NKR_CPP_USE_APPDATA)
-endif ()
-
 #### NKR EXTERNAL ####
 
 if (NKR_NO_EXTERNAL)
@@ -69,15 +70,6 @@ if (NKR_NO_EXTERNAL)
     set(NKR_NO_YAML 1)
     set(NKR_NO_ZXING 1)
     set(NKR_NO_QHOTKEY 1)
-    set(NKR_NO_QUICKJS 1)
-endif ()
-
-# quickjs (static submodule)
-if (NKR_NO_QUICKJS)
-    nkr_add_compile_definitions(NKR_NO_QUICKJS)
-else ()
-    add_subdirectory(3rdparty/qjs)
-    list(APPEND NKR_EXTERNAL_TARGETS quickjs)
 endif ()
 
 # grpc
@@ -128,42 +120,38 @@ endif ()
 
 # Sources
 set(PROJECT_SOURCES
-        ${PLATFORM_FUCKING_SOURCES}
+        ${PLATFORM_SOURCES}
 
         main/main.cpp
-        main/NekoRay.cpp
-        main/NekoRay_Utils.cpp
-        main/QJS.cpp
+        main/NekoGui.cpp
+        main/NekoGui_Utils.cpp
+        main/HTTPRequestHelper.cpp
 
         3rdparty/base64.cpp
         3rdparty/qrcodegen.cpp
         3rdparty/QtExtKeySequenceEdit.cpp
 
-        qv2ray/v2/ui/LogHighlighter.cpp
-        qv2ray/v2/ui/QvAutoCompleteTextEdit.cpp
-        qv2ray/v2/utils/HTTPRequestHelper.cpp
-        qv2ray/v2/components/proxy/QvProxyConfigurator.cpp
-        qv2ray/v2/ui/widgets/common/QJsonModel.cpp
-        qv2ray/v2/ui/widgets/editors/w_JsonEditor.cpp
-        qv2ray/v2/ui/widgets/editors/w_JsonEditor.hpp
-        qv2ray/v2/ui/widgets/editors/w_JsonEditor.ui
+        3rdparty/qv2ray/v2/ui/QvAutoCompleteTextEdit.cpp
+        3rdparty/qv2ray/v2/components/proxy/QvProxyConfigurator.cpp
+        3rdparty/qv2ray/v2/ui/widgets/common/QJsonModel.cpp
+        3rdparty/qv2ray/v2/ui/widgets/editors/w_JsonEditor.cpp
+        3rdparty/qv2ray/v2/ui/widgets/editors/w_JsonEditor.hpp
+        3rdparty/qv2ray/v2/ui/widgets/editors/w_JsonEditor.ui
 
-        qv2ray/v3/components/GeositeReader/GeositeReader.cpp
-        qv2ray/v3/components/GeositeReader/picoproto.cpp
+        3rdparty/qv2ray/v3/components/GeositeReader/GeositeReader.cpp
+        3rdparty/qv2ray/v3/components/GeositeReader/picoproto.cpp
 
         rpc/gRPC.cpp
 
         db/Database.cpp
-        db/TrafficLooper.cpp
+        db/traffic/TrafficLooper.cpp
         db/ProfileFilter.cpp
         db/ConfigBuilder.cpp
 
         fmt/AbstractBean.cpp
-        fmt/Bean2CoreObj_ray.cpp
         fmt/Bean2CoreObj_box.cpp
         fmt/Bean2External.cpp
         fmt/Bean2Link.cpp
-        fmt/InsecureHint.cpp
         fmt/Link2Bean.cpp
         fmt/ChainBean.hpp # translate
 
@@ -173,7 +161,7 @@ set(PROJECT_SOURCES
         sys/AutoRun.cpp
 
         ui/ThemeManager.cpp
-        ui/TrayIcon.cpp
+        ui/Icon.cpp
 
         ui/mainwindow_grpc.cpp
         ui/mainwindow.cpp
@@ -206,6 +194,10 @@ set(PROJECT_SOURCES
         ui/edit/edit_naive.h
         ui/edit/edit_naive.cpp
         ui/edit/edit_naive.ui
+
+        ui/edit/edit_quic.h
+        ui/edit/edit_quic.cpp
+        ui/edit/edit_quic.ui
 
         ui/edit/edit_custom.h
         ui/edit/edit_custom.cpp
@@ -241,76 +233,70 @@ set(PROJECT_SOURCES
         res/neko.qrc
         res/theme/feiyangqingyun/qss.qrc
         ${QV2RAY_RC}
-        )
+)
 
 # Qt exe
 if (${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(nekoray
+    qt_add_executable(nekobox
             MANUAL_FINALIZATION
             ${PROJECT_SOURCES}
-            )
+    )
     # Define target properties for Android with Qt 6 as:
-    #    set_property(TARGET nekoray APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
+    #    set_property(TARGET nekobox APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
     #                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
     # For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 else ()
     if (ANDROID)
-        add_library(nekoray SHARED
+        add_library(nekobox SHARED
                 ${PROJECT_SOURCES}
-                )
+        )
         # Define properties for Android with Qt 5 after find_package() calls as:
         #    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
     else ()
-        add_executable(nekoray
+        add_executable(nekobox
                 ${PROJECT_SOURCES}
-                )
+        )
     endif ()
 endif ()
 
 # Target
 
-set_property(TARGET nekoray PROPERTY AUTOUIC ON)
-set_property(TARGET nekoray PROPERTY AUTOMOC ON)
-set_property(TARGET nekoray PROPERTY AUTORCC ON)
+set_property(TARGET nekobox PROPERTY AUTOUIC ON)
+set_property(TARGET nekobox PROPERTY AUTOMOC ON)
+set_property(TARGET nekobox PROPERTY AUTORCC ON)
 
-# Target Source macOS
-
-set(MACOSX_ICON ${CMAKE_SOURCE_DIR}/res/nekoray.icns)
-if (APPLE)
-    target_sources(nekoray PRIVATE ${MACOSX_ICON})
-endif ()
-set_target_properties(nekoray PROPERTIES
-        MACOSX_BUNDLE_ICON_FILE "nekoray.icns"
-        RESOURCE ${MACOSX_ICON}
-        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/res/MacOSXBundleInfo.plist
-        MACOSX_BUNDLE_GUI_IDENTIFIER moe.nekoray.macosx
-        MACOSX_BUNDLE TRUE
+set_target_properties(nekobox PROPERTIES
         WIN32_EXECUTABLE TRUE
-        )
+)
 
 # Target Source Translations
 
 set(TS_FILES
         translations/zh_CN.ts
-        )
+        translations/fa_IR.ts
+        translations/ru_RU.ts
+)
+set(LUPDATE_OPTIONS
+        -locations none -no-obsolete
+)
 if (${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_lupdate(nekoray TS_FILES ${TS_FILES})
-    qt_add_lrelease(nekoray TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE QM_FILES)
+    qt_add_lupdate(nekobox TS_FILES ${TS_FILES} OPTIONS ${LUPDATE_OPTIONS})
+    qt_add_lrelease(nekobox TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE QM_FILES)
 else ()
-    qt5_create_translation(QM_FILES ${PROJECT_SOURCES} ${TS_FILES} OPTIONS -locations none)
+    qt5_create_translation(QM_FILES ${PROJECT_SOURCES} ${TS_FILES} OPTIONS ${LUPDATE_OPTIONS})
 endif ()
 configure_file(translations/translations.qrc ${CMAKE_BINARY_DIR} COPYONLY)
-target_sources(nekoray PRIVATE ${CMAKE_BINARY_DIR}/translations.qrc)
+target_sources(nekobox PRIVATE ${CMAKE_BINARY_DIR}/translations.qrc)
 
 # Target Link
 
-target_link_libraries(nekoray PRIVATE
+target_link_libraries(nekobox PRIVATE
         Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Svg
         Threads::Threads
         ${NKR_EXTERNAL_TARGETS}
-        ${PLATFORM_FUCKING_LIBRARIES}
-        )
+        ${PLATFORM_LIBRARIES}
+)
 
 if (QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(nekoray)
+    qt_finalize_executable(nekobox)
 endif ()

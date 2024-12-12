@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"neko/gen"
-	"neko/pkg/grpc_server"
-	"neko/pkg/neko_common"
-	"neko/pkg/neko_log"
-	"neko/pkg/speedtest"
-	"nekobox_core/box_main"
-	"reflect"
-	"unsafe"
 
+	"grpc_server"
+	"grpc_server/gen"
+
+	"github.com/matsuridayo/libneko/neko_common"
+	"github.com/matsuridayo/libneko/neko_log"
+	"github.com/matsuridayo/libneko/speedtest"
 	box "github.com/sagernet/sing-box"
-	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/experimental/v2rayapi"
+	"github.com/sagernet/sing-box/boxapi"
+	boxmain "github.com/sagernet/sing-box/cmd/sing-box"
+
+	"log"
+
+	"github.com/sagernet/sing-box/option"
 )
 
 type server struct {
@@ -43,23 +44,17 @@ func (s *server) Start(ctx context.Context, in *gen.LoadConfigReq) (out *gen.Err
 		return
 	}
 
-	instance, instance_cancel, err = box_main.Create([]byte(in.CoreConfig), true)
+	instance, instance_cancel, err = boxmain.Create([]byte(in.CoreConfig))
 
 	if instance != nil {
 		// Logger
-		logFactory_ := reflect.Indirect(reflect.ValueOf(instance)).FieldByName("logFactory")
-		logFactory_ = reflect.NewAt(logFactory_.Type(), unsafe.Pointer(logFactory_.UnsafeAddr())).Elem() // get unexported logFactory
-		logFactory_ = logFactory_.Elem().Elem()                                                          // get struct
-		writer_ := logFactory_.FieldByName("writer")
-		writer_ = reflect.NewAt(writer_.Type(), unsafe.Pointer(writer_.UnsafeAddr())).Elem() // get unexported io.Writer
-		writer_.Set(reflect.ValueOf(neko_log.LogWriter))
+		instance.SetLogWritter(neko_log.LogWriter)
 		// V2ray Service
-		v2ray_ := reflect.Indirect(reflect.ValueOf(instance)).FieldByName("v2rayServer")
-		v2ray_ = reflect.NewAt(v2ray_.Type(), unsafe.Pointer(v2ray_.UnsafeAddr())).Elem()
-		if v2ray, ok := v2ray_.Interface().(adapter.V2RayServer); ok {
-			if s, ok := v2ray.StatsService().(*v2rayapi.StatsService); ok {
-				box_v2ray_service = s
-			}
+		if in.StatsOutbounds != nil {
+			instance.Router().SetV2RayServer(boxapi.NewSbV2rayServer(option.V2RayStatsServiceOptions{
+				Enabled:   true,
+				Outbounds: in.StatsOutbounds,
+			}))
 		}
 	}
 
@@ -81,10 +76,10 @@ func (s *server) Stop(ctx context.Context, in *gen.EmptyReq) (out *gen.ErrorResp
 	}
 
 	instance_cancel()
-	instance.Close() // xx closed
+	instance.Close()
 
 	instance = nil
-	box_v2ray_service = nil
+
 	return
 }
 
@@ -100,11 +95,13 @@ func (s *server) Test(ctx context.Context, in *gen.TestReq) (out *gen.TestResp, 
 
 	if in.Mode == gen.TestMode_UrlTest {
 		var i *box.Box
+		var cancel context.CancelFunc
 		if in.Config != nil {
 			// Test instance
-			i, instance_cancel, err = box_main.Create([]byte(in.Config.CoreConfig), true)
-			if instance_cancel != nil {
-				defer instance_cancel()
+			i, cancel, err = boxmain.Create([]byte(in.Config.CoreConfig))
+			if i != nil {
+				defer i.Close()
+				defer cancel()
 			}
 			if err != nil {
 				return
@@ -117,11 +114,19 @@ func (s *server) Test(ctx context.Context, in *gen.TestReq) (out *gen.TestResp, 
 			}
 		}
 		// Latency
-		out.Ms, err = speedtest.UrlTest(getProxyHttpClient(i), in.Url, in.Timeout)
+		out.Ms, err = speedtest.UrlTest(boxapi.CreateProxyHttpClient(i), in.Url, in.Timeout, speedtest.UrlTestStandard_RTT)
 	} else if in.Mode == gen.TestMode_TcpPing {
 		out.Ms, err = speedtest.TcpPing(in.Address, in.Timeout)
-	} else {
-		err = fmt.Errorf("not available")
+	} else if in.Mode == gen.TestMode_FullTest {
+		i, cancel, err := boxmain.Create([]byte(in.Config.CoreConfig))
+		if i != nil {
+			defer i.Close()
+			defer cancel()
+		}
+		if err != nil {
+			return
+		}
+		return grpc_server.DoFullTest(ctx, in, i)
 	}
 
 	return
@@ -130,14 +135,9 @@ func (s *server) Test(ctx context.Context, in *gen.TestReq) (out *gen.TestResp, 
 func (s *server) QueryStats(ctx context.Context, in *gen.QueryStatsReq) (out *gen.QueryStatsResp, _ error) {
 	out = &gen.QueryStatsResp{}
 
-	if box_v2ray_service != nil {
-		req := &v2rayapi.GetStatsRequest{
-			Name:   fmt.Sprintf("outbound>>>%s>>>traffic>>>%s", in.Tag, in.Direct),
-			Reset_: true,
-		}
-		resp, err := box_v2ray_service.GetStats(ctx, req)
-		if err == nil {
-			out.Traffic = resp.Stat.Value
+	if instance != nil {
+		if ss, ok := instance.Router().V2RayServer().(*boxapi.SbV2rayServer); ok {
+			out.Traffic = ss.QueryStats(fmt.Sprintf("outbound>>>%s>>>traffic>>>%s", in.Tag, in.Direct))
 		}
 	}
 
